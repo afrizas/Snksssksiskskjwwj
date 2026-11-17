@@ -1,0 +1,48 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cari folder proyek
+        id: find
+        run: |
+          # Kalau yang diunggah berupa file .zip, ekstrak dulu.
+          for z in *.zip; do
+            if [ -f "$z" ]; then unzip -q "$z" -d _proyek; fi
+          done
+          SETTINGS=$(find . -name settings.gradle.kts -not -path "./.git/*" | head -n 1)
+          if [ -z "$SETTINGS" ]; then
+            echo "settings.gradle.kts tidak ditemukan" >&2
+            exit 1
+          fi
+          echo "dir=$(dirname "$SETTINGS")" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build APK
+        working-directory: ${{ steps.find.outputs.dir }}
+        run: gradle assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CBT-SMKN14-Beta-APK
+          path: ${{ steps.find.outputs.dir }}/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
