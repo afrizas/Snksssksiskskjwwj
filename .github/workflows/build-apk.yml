@@ -17,7 +17,6 @@ jobs:
       - name: Cari folder proyek
         id: find
         run: |
-          # Kalau yang diunggah berupa file .zip, ekstrak dulu.
           for z in *.zip; do
             if [ -f "$z" ]; then unzip -q "$z" -d _proyek; fi
           done
@@ -26,7 +25,9 @@ jobs:
             echo "settings.gradle.kts tidak ditemukan" >&2
             exit 1
           fi
-          echo "dir=$(dirname "$SETTINGS")" >> "$GITHUB_OUTPUT"
+          PROJ_DIR=$(dirname "$SETTINGS")
+          find "$PROJ_DIR" -name "MainActivity.kt" -exec sed -i 's/singleLine = true/setSingleLine(true)/g' {} +
+          echo "dir=$PROJ_DIR" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-java@v4
         with:
