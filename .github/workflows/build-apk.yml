@@ -1,49 +1,59 @@
-name: Build APK
+name: Build Android APK
 
 on:
-  workflow_dispatch:
   push:
-
-permissions:
-  contents: read
+    branches:
+      - main
+      - master
+  workflow_dispatch:
 
 jobs:
   build:
+    name: Build Debug APK
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-      - name: Cari folder proyek
-        id: find
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Detect Project Directory
         run: |
-          for z in *.zip; do
-            if [ -f "$z" ]; then unzip -q "$z" -d _proyek; fi
-          done
-          SETTINGS=$(find . -name settings.gradle.kts -not -path "./.git/*" | head -n 1)
-          if [ -z "$SETTINGS" ]; then
-            echo "settings.gradle.kts tidak ditemukan" >&2
-            exit 1
+          if [ -f "settings.gradle.kts" ]; then
+            PROJECT_DIR="."
+          elif [ -f "CBT_SMKN14_Exambrowser_Beta_020/settings.gradle.kts" ]; then
+            PROJECT_DIR="CBT_SMKN14_Exambrowser_Beta_020"
+          else
+            PROJECT_DIR=$(dirname "$(find . -maxdepth 3 -name "settings.gradle.kts" | head -n 1)")
           fi
-          PROJ_DIR=$(dirname "$SETTINGS")
-          find "$PROJ_DIR" -name "MainActivity.kt" -exec sed -i 's/singleLine = true/setSingleLine(true)/g' {} +
-          echo "dir=$PROJ_DIR" >> "$GITHUB_OUTPUT"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
 
-      - uses: actions/setup-java@v4
+      - name: Build Debug APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug
+          else
+            gradle assembleDebug
+          fi
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
         with:
-          distribution: temurin
-          java-version: "17"
-
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.9"
-
-      - name: Build APK
-        working-directory: ${{ steps.find.outputs.dir }}
-        run: gradle assembleDebug --no-daemon
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: CBT-SMKN14-Beta-APK
-          path: ${{ steps.find.outputs.dir }}/app/build/outputs/apk/debug/*.apk
+          name: CBT-SMKN14-Exambrowser-Beta-APK
+          path: "**/app/build/outputs/apk/debug/*.apk"
           if-no-files-found: error
